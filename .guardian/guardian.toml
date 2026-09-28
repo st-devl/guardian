@@ -1,6 +1,6 @@
 # Guardian V1 — Project Brain (NOT CONFIGURED YET)
-# Checks report ERROR G010 until modules exist. To configure, tell your AI agent:
-#   Run `python3 .guardian/guardian.py onboard` and follow it.
+# Checks report ERROR G010 until modules exist. Write PROJECT.md (README, step 2), then
+# tell your AI agent: Run `python3 .guardian/guardian.py onboard` and follow it.
 # Semantics: header of guardian.py. Examples: README (section 5).
 # Unknown keys are a config ERROR (typos never silently disable a rule).
 

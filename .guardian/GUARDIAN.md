@@ -12,7 +12,8 @@ It does NOT check logic, security, style, runtime DI, reflection or string-based
 - exit 1 BLOCK: fix the application code.
 - exit 2 ERROR: stop. Show the message to the human. Do not retry. Do not modify `.guardian/`.
 - Exception: onboarding. Only when the human asks for it, run
-  `python3 .guardian/guardian.py onboard` and follow it; it may write `.guardian/guardian.toml`.
+  `python3 .guardian/guardian.py onboard` and follow it (source: PROJECT.md, read once);
+  it may write `.guardian/guardian.toml` after the human approves.
 
 ## When the fix needs a new dependency
 If the correct fix needs a module dependency not in `depends`, or a forbidden import:

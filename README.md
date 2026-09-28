@@ -113,54 +113,106 @@ python3 .guardian/guardian.py --selftest && echo OK
 
 Çıktı yalnızca `OK` olmalıdır. Başka bir şey görürseniz kuruluma devam etmeyin.
 
-### Adım 2: Onboarding (Project Brain'i AI çıkarır)
+### Adım 2: PROJECT.md ve onboarding
 
-Kopyalanan `guardian.toml` henüz yapılandırılmamış bir iskelettir. Modül tanımlanana kadar
-`check` ve `context` bilerek `ERROR G010` verir: boş bir Brain hiçbir şeyi kontrol etmez,
-bu yüzden PASS sayılamaz.
+Projenin **amacı ve tasarlanan mimarisi** proje kökündeki `PROJECT.md` dosyasında,
+insan tarafından tanımlanır. Guardian bu dosyayı **yalnızca onboarding sırasında bir kez**
+okur ve kendi çalışması için gereken minimum bilgiyi `guardian.toml` (Project Brain)
+dosyasına aktarır. Sıfırdan başlayan ve geliştirmesi devam eden projeler aynı modeli
+kullanır.
 
-Teknolojileri, kaynak dizinlerini, modülleri ve alias'ları **elle yazmazsınız.** AI ajanına
-şunu söyleyin:
+```
+PROJECT.md     →  onboarding kaynağı (insanın niyeti, bir kez okunur)
+guardian.toml  →  Guardian'ın çalışma Brain'i (her kontrolde kullanılır)
+```
+
+**1. `PROJECT.md` yazın.** Aşağıdaki 8 başlık zorunludur. Başlıklar İngilizce veya Türkçe
+olabilir, numaralandırılabilir (`## 1. Mimari`). Uygulanmayan bölüme `none` veya `yok`
+yazın. Yorumlar (`<!-- -->`) içerik sayılmaz.
+
+```markdown
+# PROJECT
+
+## Amaç
+Bağış toplama ve raporlama platformu.
+
+## Teknoloji
+TypeScript, Next.js.
+
+## Kaynak dizinleri
+src/
+
+## Mimari
+Feature modülleri; ortak kod shared altında. Feature'lar birbirinin
+içine doğrudan erişmez, yalnızca izin verilen bağımlılıklarla konuşur.
+
+## Modüller
+- shared: src/shared (ortak yardımcılar, UI)
+- users: src/features/users (kullanıcı ve yetki)
+- donations: src/features/donations (bağış akışı)
+- reports: src/features/reports (raporlama)
+
+## Bağımlılıklar
+- users -> shared
+- donations -> users, shared
+- reports -> donations, users, shared
+
+## Import aliases
+@/ -> src/
+
+## Kurallar
+- Controller'lar repository'lere doğrudan erişmez, service kullanır.
+- Payment account tenant'a aittir.
+```
+
+| Bölüm | Kabul edilen başlıklar |
+|---|---|
+| Purpose | `Purpose`, `Amaç` |
+| Stack | `Stack`, `Teknoloji` |
+| Source roots | `Source roots`, `Kaynak dizinleri` |
+| Architecture | `Architecture`, `Mimari` |
+| Modules | `Modules`, `Modüller` |
+| Dependencies | `Dependencies`, `Bağımlılıklar` |
+| Import aliases | `Import aliases`, `Import alias` |
+| Rules | `Rules`, `Kurallar` |
+
+**2. AI ajanına onboarding'i başlatın:**
 
 > Run `python3 .guardian/guardian.py onboard` and follow it.
 
-Bu tek seferlik süreçte:
+`onboard` önce `PROJECT.md`'yi mekanik olarak doğrular:
 
-1. **AI tespit eder, size sormaz:** `package.json`, `tsconfig`/`jsconfig` `paths`,
-   `composer.json` (PSR-4), `pyproject.toml`, `go.mod` dosyalarını ve dizin yapısını
-   okuyarak dilleri, kaynak dizinlerini ve `[resolve]` prefix'lerini çıkarır.
-2. **Modül taslağını yazar.** Başlangıçta her modül için `depends = []` olur ve hiç
-   `forbid_import` kuralı eklenmez.
-3. **`onboard` komutunu tekrar çalıştırır.** Komut bu kez gözlenen gerçek bağımlılık
-   grafiğini basar. Grafik, normal kontrollerde kullanılan extractor'la üretilir; ek bir
-   keşif motoru yoktur.
-   ```
-   OBSERVED (current state; counts = importing files; ! = not in depends):
-   donations -> payments(12)!, shared(30)!
-   reports -> donations(4)!
-   users -> donations(1)!
-   cycles: donations<->users
-   unmapped code: src/misc(3)
-   ```
-4. **Mevcut durumu mimari niyetle karıştırmaz.** Gözlenen her bağımlılık bir gerçektir,
-   ama onay değildir. AI, açık olanları (`feature -> shared` gibi) `depends` için önerir.
-   Döngüler, `shared -> feature`, alt katmandan üst katmana ve feature'dan feature'a
-   bağımlılıklar ile belirsiz her şeyi **size sorar**.
-5. **Yalnızca koddan cevaplanamayan soruları tek bir kısa liste halinde sorar.**
-6. **Cevaplarınızı uygular.** Onaylanan bağımlılıklar `depends` listesine girer. Reddedilen
-   mevcut bağımlılıklar WARN olarak görünmeye devam eder. `forbid_import` ve `advisory`
-   yalnızca sizin onayladığınız kurallar için eklenir.
-7. **`check --all` ERROR vermeyene kadar düzeltir** ve son `guardian.toml`'u onayınıza sunar.
+| Durum | Sonuç |
+|---|---|
+| `PROJECT.md` yok | `ERROR G011`, Guardian aktif olmaz |
+| Boş veya zorunlu bölümler eksik/boş | `ERROR G012` ve eksik bölümlerin listesi, Guardian aktif olmaz |
+| Yeterli | AI'ın izleyeceği kısa onboarding prosedürü |
 
-Onaydan sonra onboarding biter. Normal kontroller projeyi bir daha analiz etmez; yalnızca
-değişen dosyalara bakar. Brain sonradan kural değişikliği sürecinden geçer
-([bölüm 8](#8-kural-değişikliği-süreci)).
+Prosedüre göre AI:
+
+1. `PROJECT.md`'yi bir kez okur ve yalnızca Guardian'ın ihtiyacı olan bilgileri alır:
+   kaynak dizinleri, modüller, izin verilen bağımlılıklar, import alias'ları ve import
+   sınırı olarak ifade edilebilen kurallar.
+2. **Kaynak kodu tarayarak mimari keşfetmez.** Mevcut kod, tasarlanan mimari sayılmaz.
+3. `PROJECT.md`'de açıkça yazmayan kararları tahmin etmez. Belirsizleri size tek bir
+   kısa liste halinde sorar.
+4. Önerdiği `guardian.toml`'u size gösterir ve **yalnızca onayınızdan sonra** yazar.
+   Kurallar kalibrasyon için `severity = "warn"` ile başlar.
+5. `check --all` çalıştırır. WARN'lar mevcut kodun `PROJECT.md`'deki niyetten nerede
+   saptığını gösterir. AI bunları size raporlar; Brain'i koda uydurmak için gevşetmez.
+
+**Fail-closed:** `guardian.toml`'da modül tanımlanana kadar `check` ve `context`
+`ERROR G010` verir, asla PASS vermez. `onboard` komutunun kendisi Guardian'ı aktif etmez;
+Guardian ancak onaylanan Brain yazıldığında devreye girer.
+
+Onboarding tek seferliktir. Normal kontroller ne `PROJECT.md`'yi ne de bütün projeyi
+yeniden okur; yalnızca `guardian.toml` ve değişen dosyalarla çalışır. Brain'deki sonraki
+değişiklikler kural değişikliği sürecinden geçer ([bölüm 8](#8-kural-değişikliği-süreci)).
 
 Onboarding sırasında AI `.guardian/guardian.toml` dosyasını yazar. Bu nedenle Adım 4'teki
 `deny` izinlerini onboarding bittikten **sonra** ekleyin.
 
-Brain'in yapısı: [bölüm 4](#4-guardiantoml-referansı), elle yazılmış örnekler:
-[bölüm 5](#5-dil-örnekleri).
+Brain'in yapısı: [bölüm 4](#4-guardiantoml-referansı), örnekler: [bölüm 5](#5-dil-örnekleri).
 
 ### Adım 3: AI ajanına Guardian'ı tanıt
 
@@ -305,7 +357,7 @@ etme yetkisinin olmaması (Adım 4'teki `deny` listesi) ve merge işlemini sizin
 
 ```
 [ ] .guardian/ kopyalandı, --selftest sessiz geçiyor
-[ ] Onboarding tamamlandı (guardian.py onboard), check --all ERROR vermiyor
+[ ] PROJECT.md yazıldı, onboarding onaylandı, check --all ERROR vermiyor
 [ ] CLAUDE.md / AGENTS.md içinde GUARDIAN.md referansı var
 [ ] .claude/settings.json: Stop hook + deny izinleri
 [ ] .github/workflows/guardian.yml eklendi (motor base'den alınıyor)
@@ -571,7 +623,7 @@ python3 .guardian/guardian.py check --all
 # (CI bunu base branch'teki motorla çalıştırır, bkz. Adım 5)
 python3 .guardian/guardian.py check --base origin/main
 
-# Tek seferlik onboarding (prosedür + gözlenen bağımlılık grafiği)
+# Tek seferlik onboarding (PROJECT.md doğrulaması + prosedür)
 python3 .guardian/guardian.py onboard
 
 # Motorun kendi doğrulaması
@@ -623,7 +675,9 @@ AI düzeltme döngüsüne girmez.
 | G007 | PHP veya Go için `[resolve]` eksik | `[resolve].php` / `[resolve].go` ekleyin |
 | G008 | Dosya okunamadı | Dosya izinlerini kontrol edin |
 | G009 | Guardian iç hatası | Hata mesajıyla birlikte raporlayın |
-| G010 | Project Brain yapılandırılmamış (modül yok) | Onboarding: `guardian.py onboard` (Adım 2) |
+| G010 | Project Brain yapılandırılmamış (modül yok) | `PROJECT.md` yazın, onboarding yapın (Adım 2) |
+| G011 | `PROJECT.md` bulunamadı (onboarding) | Proje köküne `PROJECT.md` ekleyin |
+| G012 | `PROJECT.md` eksik: zorunlu bölüm yok veya boş | Mesajdaki bölümleri doldurun |
 | W001 | Kök altında modülsüz kod dosyası | Modül tanımlayın veya dosyayı taşıyın |
 | W002 | Artık hiçbir ihlali kapsamayan exception | Exception'ı kaldırın |
 | W003 | 5'ten fazla global advisory | Global bağlamı küçültün |
