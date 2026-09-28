@@ -113,29 +113,54 @@ python3 .guardian/guardian.py --selftest && echo OK
 
 Çıktı yalnızca `OK` olmalıdır. Başka bir şey görürseniz kuruluma devam etmeyin.
 
-### Adım 2: `guardian.toml`'u projeye göre yaz
+### Adım 2: Onboarding (Project Brain'i AI çıkarır)
 
-Şablondaki örnek modülleri silin ve projenin gerçek yapısını tanımlayın:
+Kopyalanan `guardian.toml` henüz yapılandırılmamış bir iskelettir. Modül tanımlanana kadar
+`check` ve `context` bilerek `ERROR G010` verir: boş bir Brain hiçbir şeyi kontrol etmez,
+bu yüzden PASS sayılamaz.
 
-1. **Modülleri belirleyin.** Her modül bir veya birkaç dizindir (`src/donations/**`).
-   İç içe veya çakışan dizin tanımları ERROR verir.
-2. **`depends` listelerini yazın.** Her modülün hangi modüllere bağlanabileceğini açıkça
-   belirtin. Bağımlılığı olmayan modül için `depends = []`.
-3. **Ortak kod varsa** bunu `shared` gibi ayrı bir modül yapın ve diğer modüllerin
-   `depends` listesine ekleyin.
-4. **Alias ve prefix'leri `[resolve]` altına yazın.** tsconfig `paths`, PSR-4 namespace'leri,
-   Go module path'i.
-5. **Katman kurallarını `forbid_import` olarak ekleyin.**
-6. **Mekanik olarak kontrol edilemeyen kısa kararları `advisory` olarak ekleyin.**
+Teknolojileri, kaynak dizinlerini, modülleri ve alias'ları **elle yazmazsınız.** AI ajanına
+şunu söyleyin:
 
-Doğru modül haritasını bulmanın pratik yolu şudur: tam taramayı çalıştırın ve çıkan
-`W001` (modülsüz dosya) ile `DEPS` uyarılarına bakın.
+> Run `python3 .guardian/guardian.py onboard` and follow it.
 
-```bash
-python3 .guardian/guardian.py check --all
-```
+Bu tek seferlik süreçte:
 
-Ayrıntılar: [bölüm 4](#4-guardiantoml-referansı), örnekler: [bölüm 5](#5-dil-örnekleri).
+1. **AI tespit eder, size sormaz:** `package.json`, `tsconfig`/`jsconfig` `paths`,
+   `composer.json` (PSR-4), `pyproject.toml`, `go.mod` dosyalarını ve dizin yapısını
+   okuyarak dilleri, kaynak dizinlerini ve `[resolve]` prefix'lerini çıkarır.
+2. **Modül taslağını yazar.** Başlangıçta her modül için `depends = []` olur ve hiç
+   `forbid_import` kuralı eklenmez.
+3. **`onboard` komutunu tekrar çalıştırır.** Komut bu kez gözlenen gerçek bağımlılık
+   grafiğini basar. Grafik, normal kontrollerde kullanılan extractor'la üretilir; ek bir
+   keşif motoru yoktur.
+   ```
+   OBSERVED (current state; counts = importing files; ! = not in depends):
+   donations -> payments(12)!, shared(30)!
+   reports -> donations(4)!
+   users -> donations(1)!
+   cycles: donations<->users
+   unmapped code: src/misc(3)
+   ```
+4. **Mevcut durumu mimari niyetle karıştırmaz.** Gözlenen her bağımlılık bir gerçektir,
+   ama onay değildir. AI, açık olanları (`feature -> shared` gibi) `depends` için önerir.
+   Döngüler, `shared -> feature`, alt katmandan üst katmana ve feature'dan feature'a
+   bağımlılıklar ile belirsiz her şeyi **size sorar**.
+5. **Yalnızca koddan cevaplanamayan soruları tek bir kısa liste halinde sorar.**
+6. **Cevaplarınızı uygular.** Onaylanan bağımlılıklar `depends` listesine girer. Reddedilen
+   mevcut bağımlılıklar WARN olarak görünmeye devam eder. `forbid_import` ve `advisory`
+   yalnızca sizin onayladığınız kurallar için eklenir.
+7. **`check --all` ERROR vermeyene kadar düzeltir** ve son `guardian.toml`'u onayınıza sunar.
+
+Onaydan sonra onboarding biter. Normal kontroller projeyi bir daha analiz etmez; yalnızca
+değişen dosyalara bakar. Brain sonradan kural değişikliği sürecinden geçer
+([bölüm 8](#8-kural-değişikliği-süreci)).
+
+Onboarding sırasında AI `.guardian/guardian.toml` dosyasını yazar. Bu nedenle Adım 4'teki
+`deny` izinlerini onboarding bittikten **sonra** ekleyin.
+
+Brain'in yapısı: [bölüm 4](#4-guardiantoml-referansı), elle yazılmış örnekler:
+[bölüm 5](#5-dil-örnekleri).
 
 ### Adım 3: AI ajanına Guardian'ı tanıt
 
@@ -280,7 +305,7 @@ etme yetkisinin olmaması (Adım 4'teki `deny` listesi) ve merge işlemini sizin
 
 ```
 [ ] .guardian/ kopyalandı, --selftest sessiz geçiyor
-[ ] guardian.toml projeye göre yazıldı, check --all ERROR vermiyor
+[ ] Onboarding tamamlandı (guardian.py onboard), check --all ERROR vermiyor
 [ ] CLAUDE.md / AGENTS.md içinde GUARDIAN.md referansı var
 [ ] .claude/settings.json: Stop hook + deny izinleri
 [ ] .github/workflows/guardian.yml eklendi (motor base'den alınıyor)
@@ -546,6 +571,9 @@ python3 .guardian/guardian.py check --all
 # (CI bunu base branch'teki motorla çalıştırır, bkz. Adım 5)
 python3 .guardian/guardian.py check --base origin/main
 
+# Tek seferlik onboarding (prosedür + gözlenen bağımlılık grafiği)
+python3 .guardian/guardian.py onboard
+
 # Motorun kendi doğrulaması
 python3 .guardian/guardian.py --selftest
 ```
@@ -595,10 +623,11 @@ AI düzeltme döngüsüne girmez.
 | G007 | PHP veya Go için `[resolve]` eksik | `[resolve].php` / `[resolve].go` ekleyin |
 | G008 | Dosya okunamadı | Dosya izinlerini kontrol edin |
 | G009 | Guardian iç hatası | Hata mesajıyla birlikte raporlayın |
+| G010 | Project Brain yapılandırılmamış (modül yok) | Onboarding: `guardian.py onboard` (Adım 2) |
 | W001 | Kök altında modülsüz kod dosyası | Modül tanımlayın veya dosyayı taşıyın |
 | W002 | Artık hiçbir ihlali kapsamayan exception | Exception'ı kaldırın |
 | W003 | 5'ten fazla global advisory | Global bağlamı küçültün |
-| W004 | Base branch'te `guardian.toml` yok (ilk kurulum PR'ı) | Normal; PR merge edilince kaybolur |
+| W004 | Base branch'te yapılandırılmış Brain yok (kurulum/onboarding PR'ı); head kurallarıyla tam tarama yapılır | Normal; PR merge edilince kaybolur |
 
 ---
 

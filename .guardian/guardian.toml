@@ -1,67 +1,30 @@
-# Guardian V1 — Project Brain
-# Semantics: see header of guardian.py. Unknown keys are a config ERROR (typos never silently disable a rule).
+# Guardian V1 — Project Brain (NOT CONFIGURED YET)
+# Checks report ERROR G010 until modules exist. To configure, tell your AI agent:
+#   Run `python3 .guardian/guardian.py onboard` and follow it.
+# Semantics: header of guardian.py. Examples: README (section 5).
+# Unknown keys are a config ERROR (typos never silently disable a rule).
 
-# Files never analysed (non-code assets are already skipped by default).
-# Top-level key: must stay above the first [table].
+# Top-level keys must stay above the first [table].
 ignore = []
 
 [project]
-name = "example"
+name = ""
 
 # Import prefix -> repo path. Longest prefix wins. Unmatched non-relative imports are external.
-# js: relative imports need no config. py: default is {"" = ""} (absolute imports from repo root).
-# php and go are REQUIRED when such files are in rule scope (otherwise ERROR, never silent PASS).
+# js: relative imports need no config. py default: {"" = ""}. php/go: required if present.
 [resolve]
-js = { "@/" = "src/" }
+# js  = { "@/" = "src/" }
 # php = { 'App\' = "app/" }
 # go  = { "github.com/acme/app/" = "" }
 
-# Module paths must be "<literal dir>/**". Nested/overlapping dirs are a config ERROR.
-# depends is required; [] means no dependencies. Enforced by the module_deps rule (always on).
-[modules.shared]
-paths = ["src/shared/**"]
-depends = []
+# Modules: "<literal dir>/**", no nesting/overlap. depends is required ([] = none).
+# [modules.shared]
+# paths = ["src/shared/**"]
+# depends = []
 
-[modules.users]
-paths = ["src/users/**"]
-depends = ["shared"]
-
-[modules.payments]
-paths = ["src/payments/**"]
-depends = ["users", "shared"]
-
-[modules.donations]
-paths = ["src/donations/**"]
-depends = ["users", "payments", "shared"]
-
-[modules.reports]
-paths = ["src/reports/**"]
-depends = ["donations", "payments", "users", "shared"]
-
-# Calibration (spec 2.34): start enforced rules as "warn" for ~1 week, then switch to "block".
+# Calibration: enforced rules start as "warn" for ~1 week, then "block".
 [[rules]]
 id = "DEPS"
 type = "module_deps"
 severity = "warn"
 msg = "Module dependency outside depends"
-
-[[rules]]
-id = "ARCH-01"
-type = "forbid_import"
-from = ["src/**/controllers/**"]
-targets = ["src/**/repositories/**"]
-severity = "warn"
-msg = "Controller -> service kullan"
-# except = [{ path = "src/legacy/old-payment.ts", reason = "Pre-Guardian legacy" }]
-
-[[rules]]
-id = "TENANT-03"
-type = "advisory"
-modules = ["donations", "payments"]
-msg = "Payment account tenant'a aittir"
-
-# Advisory without `modules` is global (keep <= 5).
-[[rules]]
-id = "GLOBAL-01"
-type = "advisory"
-msg = "Her sorgu tenant_id ile filtrelenir"

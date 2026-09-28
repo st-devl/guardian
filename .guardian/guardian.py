@@ -5,6 +5,7 @@ Usage:
   guardian.py check [--all] [--base REF]   L1: changed files | --all: full scan | --base: CI (L3)
   guardian.py context <module|path>        minimum architecture context
   guardian.py hook                         Claude Code Stop-hook adapter
+  guardian.py onboard                      one-time: procedure + observed dependency graph
   guardian.py --selftest
 
 Exit codes (core contract): 0 PASS, 1 BLOCK, 2 ERROR.
@@ -40,6 +41,7 @@ import shutil
 import subprocess
 import tempfile
 import tomllib
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
@@ -627,7 +629,7 @@ def run_check(root, all_=False, base=None):
     rep, head_text = Report(), load_config(root)
     repo = Repo(root)
     if base is None:
-        cfg = Config(head_text)
+        cfg = configured(Config(head_text))
         files = repo.all_files() if all_ else repo.changed()
         if not all_ and TOML_REL in files:  # rule change: check the full rule scope
             files, all_ = repo.all_files(), True
@@ -638,20 +640,102 @@ def run_check(root, all_=False, base=None):
 
     mb = repo.merge_base(base)
     base_text = repo.show(base, TOML_REL)
-    if base_text is None:
-        rep.warns.append(("W004", f"WARN W004 {base} has no {TOML_REL}; using head rules"))
-    cfg = Config(base_text if base_text is not None else head_text)
+    cfg = Config(base_text) if base_text is not None else None
+    if cfg is None or not cfg.modules:  # install/onboarding PR: no base policy to protect yet
+        rep.warns.append(("W004", f"WARN W004 {base} has no configured Project Brain; "
+                                  "using head rules on the full scope"))
+        cfg = configured(Config(head_text))
+        full_scan_warns(cfg, evaluate(cfg, root, repo.all_files(), rep), rep)
+        return render(rep)
     used = evaluate(cfg, root, repo.all_files() if all_ else repo.diff(mb), rep)
     if all_:
         full_scan_warns(cfg, used, rep)
-    if base_text is not None and base_text != head_text:  # rules changed in this PR
-        hcfg = Config(head_text)
+    if base_text != head_text:  # rules changed in this PR
+        hcfg = configured(Config(head_text))
         full_scan_warns(hcfg, evaluate(hcfg, root, repo.all_files(), rep, "[head]"), rep, "[head]")
     return render(rep)
 
 
-def run_context(root, target):
+def configured(cfg):
+    """An empty Project Brain checks nothing, so it must never read as PASS."""
+    if not cfg.modules:
+        raise GuardianError("G010", "Project Brain not configured (no modules). "
+                            "Onboarding: python3 .guardian/guardian.py onboard")
+    return cfg
+
+
+ONBOARD = """\
+GUARDIAN ONBOARDING (one-time; never part of normal checks)
+Goal: the SMALLEST guardian.toml that lets Guardian check static imports and module boundaries.
+1. Detect, do not ask: read manifests (package.json, tsconfig/jsconfig "paths", composer.json
+   autoload psr-4, pyproject/setup.cfg, go.mod) and the directory tree. Derive languages,
+   source roots and [resolve] prefixes. Store only what Guardian needs; no tech inventory.
+2. Propose modules as "<dir>/**" (feature or layer dirs under source roots; no nesting).
+   Genuinely shared code -> one module (e.g. shared). Non-code/unsupported files -> ignore.
+3. Write the draft with every module `depends = []` and no forbid_import rules. Re-run
+   `python3 .guardian/guardian.py onboard`: it prints the OBSERVED dependency graph.
+4. Repeat 2-3 until unmapped code is 0 or deliberately out of scope.
+5. Observed edges are the CURRENT STATE, not the intended architecture. Never copy them into
+   depends blindly. Unambiguous edges (feature -> shared, a layer order the project itself
+   documents) may be proposed as depends. Cycles, shared -> feature, lower -> higher layer,
+   feature -> feature and anything unclear go to the human.
+6. Ask the human ONE compact list: only what the code cannot answer (suspicious edges, unclear
+   boundaries, layer rules to forbid). Never ask what files already tell you.
+7. Apply answers: approved edges -> depends; rejected existing edges stay out of depends and
+   surface as WARN (fix them, or add a per-file `except` with a reason before switching to
+   block); forbid_import / advisory ONLY for rules the human confirmed.
+8. Keep enforced rules at severity = "warn" (calibration week).
+9. `python3 .guardian/guardian.py check --all` must show no ERROR. Show the final guardian.toml
+   to the human; after approval onboarding is over. Do not run it again."""
+
+
+def run_onboard(root):
+    """Procedure text plus the observed module graph (reuses the normal extractor)."""
+    lines = ONBOARD.split("\n")
     cfg = Config(load_config(root))
+    if not cfg.modules:
+        return 0, lines + ["", "STATE: no modules yet -> steps 1-3."]
+    edges, unmapped, unsupported, noresolve = {}, Counter(), Counter(), set()
+    for f in Repo(root).all_files():
+        lang = classify(f)
+        if lang == "" or any(gmatch(g, f) for g in cfg.ignore) or not (root / f).is_file():
+            continue
+        mod = cfg.module_of(f)
+        if mod is None:
+            if lang and f.split("/")[0] in cfg.roots:
+                unmapped[posixpath.dirname(f)] += 1
+            continue
+        if lang is None:
+            unsupported[posixpath.splitext(f)[1] or posixpath.basename(f)] += 1
+            continue
+        if lang in ("php", "go") and not cfg.resolve[lang]:
+            noresolve.add(lang)
+            continue
+        text = (root / f).read_text(encoding="utf-8", errors="replace")
+        for n in {cfg.module_of(t) for _, t in extract(lang, f, text, cfg)} - {None, mod}:
+            edges.setdefault(mod, Counter())[n] += 1
+    lines += ["", "OBSERVED (current state; counts = importing files; ! = not in depends):"]
+    for mod in sorted(cfg.modules):
+        deps = cfg.modules[mod][1]
+        out = [f"{n}({c}){'' if n in deps else '!'}" for n, c in sorted(edges.get(mod, {}).items())]
+        lines.append(f"{mod} -> {', '.join(out) or '-'}")
+    cycles = sorted(f"{a}<->{b}" for a in edges for b in edges[a] if a < b and a in edges.get(b, {}))
+    if cycles:
+        lines.append("cycles: " + ", ".join(cycles))
+    if unmapped:
+        top = unmapped.most_common(MAX_LINES)
+        lines.append("unmapped code: " + ", ".join(f"{d or '.'}({c})" for d, c in top)
+                     + (f" +{len(unmapped) - len(top)} more" if len(unmapped) > len(top) else ""))
+    if unsupported:
+        lines.append("no extractor inside modules (ERROR in checks; ignore or re-scope): "
+                     + ", ".join(f"{e}({c})" for e, c in unsupported.most_common()))
+    for lang in sorted(noresolve):
+        lines.append(f"{lang} files skipped: [resolve].{lang} missing")
+    return 0, lines
+
+
+def run_context(root, target):
+    cfg = configured(Config(load_config(root)))
     target = target.strip().removeprefix("./")
     if target in cfg.modules:
         mod, path = target, None
@@ -734,6 +818,8 @@ def main(argv=None):
                 else:
                     raise GuardianError("G002", f"bad argument {a!r}\n{USAGE}")
             code, lines = run_check(root, all_, base)
+        elif cmd == "onboard" and not rest:
+            code, lines = run_onboard(root)
         elif cmd == "context" and len(rest) == 1:
             code, lines = run_context(root, rest[0])
         else:
@@ -1061,6 +1147,25 @@ def selftest():
         tmp.append(nogit)
         put(nogit, TOML_REL, toml)
         ok(has(check(nogit), 2, "G004"), "no git repo -> ERROR")
+
+        # --- onboarding: an empty brain never PASSes; onboard prints the observed graph
+        d4 = project({**base_files, "src/misc/x.ts": 'import x from "../users/repositories/repo";\n',
+                      "src/users/bad.ts": 'import d from "../donations/api";\n',
+                      "src/reports/v.vue": "<template/>\n"}, "[resolve]\njs = {}\n")
+        ok(has(check(d4), 2, "ERROR G010"), "empty Project Brain -> ERROR G010")
+        ok(raises(lambda: run_context(d4, "src/a.ts"), "G010"), "context on empty brain -> G010")
+        ok(run_onboard(d4)[1][-1].startswith("STATE: no modules"), "onboard without modules")
+        put(d4, TOML_REL, ST_TOML.replace('depends = ["users"]', "depends = []"))
+        ob = run_onboard(d4)[1]
+        ok({"donations -> users(1)!", "reports -> donations(1)", "users -> donations(1)!",
+            "cycles: donations<->users", "unmapped code: src/misc(1)"} <= set(ob)
+           and any(".vue(1)" in line for line in ob), f"onboard observed graph: {ob[-6:]}")
+        g(d4, "checkout", "-q", "-b", "onboard")
+        (d4 / "src/reports/v.vue").unlink()
+        put(d4, TOML_REL, ST_TOML)
+        commit(d4, "onboard")
+        ok(has(check(d4, base="main"), 1, "WARN W004", "BLOCK DEPS src/users/bad.ts"),
+           "install PR: unconfigured base -> head rules on the full scope")
 
         # --- CI engine protection: a PR that neuters its own guardian.py is still checked
         d3 = project({**base_files, ".guardian/guardian.py": Path(__file__).read_text()}, toml)
