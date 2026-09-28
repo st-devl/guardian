@@ -63,11 +63,26 @@ GuardianV1/                 ← bu repo (Guardian'ın kaynağı)
 └── .guardian/              ← hedef projeye kopyalanan klasörün tamamı
     ├── guardian.py         ← motor + CLI + selftest (projeden bağımsız)
     ├── GUARDIAN.md         ← AI ajanı için kısa talimat (projeden bağımsız)
-    └── guardian.toml       ← Project Brain ŞABLONU (her projede yeniden yazılır)
+    └── guardian.toml       ← yapılandırılmamış Brain iskeleti (onboarding'de doldurulur)
+```
+
+Kurulumdan sonra hedef proje:
+
+```
+myapp/
+├── PROJECT.md              ← insanın yazdığı proje niyeti (onboarding'de bir kez okunur)
+├── CLAUDE.md / AGENTS.md   ← GUARDIAN.md'ye tek satırlık referans
+└── .guardian/
+    ├── guardian.py
+    ├── GUARDIAN.md
+    └── guardian.toml       ← onboarding ile oluşan, onaylanmış Project Brain
 ```
 
 - `guardian.py` ve `GUARDIAN.md` bütün projelerde **aynıdır**. Güncellemede bu ikisi değişir.
-- `guardian.toml` **projeye özeldir**. Güncellemede bu dosyaya asla dokunulmaz.
+- `guardian.toml` **projeye özeldir**. `PROJECT.md`'den onboarding ile üretilir. Güncellemede
+  bu dosyaya asla dokunulmaz.
+- `PROJECT.md` Guardian'a ait değildir; projenin kendi dokümanıdır. Guardian onu yalnızca
+  onboarding sırasında okur.
 
 ---
 
@@ -90,7 +105,7 @@ GitHub'dan:
 
 ```bash
 cd ~/code/myapp
-git clone --depth 1 https://github.com/st-devl/guardian.git /tmp/guardian
+git clone --depth 1 --branch v1.2.0 git@github.com:st-devl/guardian.git /tmp/guardian
 cp -R /tmp/guardian/.guardian ./
 rm -rf /tmp/guardian
 ```
@@ -717,7 +732,7 @@ gibi ayrı, korunan bir süreçten geçer:
 ```bash
 cd ~/code/myapp
 git checkout -b chore/guardian-update
-git clone --depth 1 --branch v1.x.y https://github.com/st-devl/guardian.git /tmp/guardian
+git clone --depth 1 --branch v1.x.y git@github.com:st-devl/guardian.git /tmp/guardian
 cp /tmp/guardian/.guardian/guardian.py /tmp/guardian/.guardian/GUARDIAN.md .guardian/
 rm -rf /tmp/guardian
 python3 .guardian/guardian.py --selftest && python3 .guardian/guardian.py check --all
