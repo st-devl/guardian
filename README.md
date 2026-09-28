@@ -170,7 +170,9 @@ anahtarlarını mevcut içerikle birleştirin):
       "Write(.guardian/**)",
       "Bash(git push origin main*)",
       "Bash(git push * main*)",
-      "Bash(gh pr merge*)"
+      "Bash(gh pr merge*)",
+      "Edit(.github/workflows/**)",
+      "Write(.github/workflows/**)"
     ]
   }
 }
@@ -207,7 +209,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python3 .guardian/guardian.py check --base origin/${{ github.base_ref }}
+      - name: Guardian (base engine + base rules)
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          # PR'daki guardian.py'ye güvenilmez: motor base branch'ten alınır.
+          if git cat-file -e "$BASE:.guardian/guardian.py" 2>/dev/null; then
+            git show "$BASE:.guardian/guardian.py" > "$RUNNER_TEMP/guardian.py"
+          else
+            echo "WARN: $BASE has no guardian.py (bootstrap PR); using PR engine"
+            cp .guardian/guardian.py "$RUNNER_TEMP/guardian.py"
+          fi
+          python3 "$RUNNER_TEMP/guardian.py" check --base "$BASE"
 ```
 
 `fetch-depth: 0` önemlidir. Shallow clone'da merge-base bulunamaz ve Guardian bilerek
@@ -215,6 +228,11 @@ jobs:
 
 CI şu şekilde çalışır:
 
+- **Motor base'den gelir.** PR kendi `guardian.py`'sini değiştirerek (örneğin her zaman
+  PASS döndürecek şekilde) kendisini doğrulayamaz. CI, base branch'teki güvenilir
+  `guardian.py`'yi PR ağacının dışına (`$RUNNER_TEMP`) çıkarır ve onu proje kökünden
+  çalıştırır. `.guardian/` dışında çalışan motor, proje kökü olarak bulunduğu dizini
+  (current directory) kullanır.
 - PR'daki kod, **base branch'teki (main)** `guardian.toml` kurallarıyla kontrol edilir.
   PR içinde kuralları gevşetmek ihlali geçirmez.
 - PR `guardian.toml`'u değiştiriyorsa yeni kurallarla ayrıca **tam tarama** yapılır.
@@ -265,7 +283,7 @@ etme yetkisinin olmaması (Adım 4'teki `deny` listesi) ve merge işlemini sizin
 [ ] guardian.toml projeye göre yazıldı, check --all ERROR vermiyor
 [ ] CLAUDE.md / AGENTS.md içinde GUARDIAN.md referansı var
 [ ] .claude/settings.json: Stop hook + deny izinleri
-[ ] .github/workflows/guardian.yml eklendi
+[ ] .github/workflows/guardian.yml eklendi (motor base'den alınıyor)
 [ ] main korumalı, guardian required status check
 [ ] CODEOWNERS eklendi
 [ ] Kalibrasyon bitince severity = "block"
@@ -485,6 +503,34 @@ depends = ["users"]
 
 ## 6. Günlük kullanım
 
+### Kontrol seviyeleri (L1 / L2 / L3)
+
+| Seviye | Ne zaman | Ne çalışır | Guardian Core'un parçası mı? |
+|---|---|---|---|
+| **L1** | Her ajan turu sonunda | `guardian.py check` (değişen dosyalar) | Evet |
+| **L2** | Commit / push gibi git checkpoint'leri | Projenin **kendi** lint, typecheck ve etkilenen test komutları | **Hayır** |
+| **L3** | Pull request | `guardian.py check --base ...` (base motor + base kurallar) | Evet (asıl enforcement) |
+
+**L2, Guardian Core'un zorunlu bir özelliği değildir.** Guardian lint, typecheck veya test
+çalıştırmaz, bunların sonucunu yorumlamaz ve bunlar için bir kural tipi sunmaz. Guardian'ın
+mekanik enforcement kapsamı **statik import bağımlılıkları ve mimari sınırlarla** sınırlıdır.
+
+İsterseniz projenin mevcut komutlarını, projede zaten kullandığınız araçla (git hook,
+husky, lefthook vb.) bir checkpoint'e bağlayabilirsiniz. Örnek `.git/hooks/pre-push`:
+
+```sh
+#!/bin/sh
+set -e
+npm run lint
+npx tsc --noEmit
+npm test -- --changedSince=origin/main
+```
+
+Bu komutlar tamamen projeye aittir. Guardian'ın PASS/BLOCK/ERROR sözleşmesinin parçası
+değildir.
+
+### Komutlar
+
 ```bash
 # AI'a (veya kendinize) minimum mimari bağlam
 python3 .guardian/guardian.py context donations
@@ -496,7 +542,8 @@ python3 .guardian/guardian.py check
 # Tam tarama (kalibrasyon, drift kontrolü)
 python3 .guardian/guardian.py check --all
 
-# CI (L3): base kurallarıyla, merge-base'den itibaren değişenler
+# L3: base kurallarıyla, merge-base'den itibaren değişenler
+# (CI bunu base branch'teki motorla çalıştırır, bkz. Adım 5)
 python3 .guardian/guardian.py check --base origin/main
 
 # Motorun kendi doğrulaması
@@ -573,7 +620,16 @@ ve BLOCK devam eder. Bu bir hata değil, bilinçli bir güvenlik davranışıdı
 
 ## 9. Guardian'ı güncelleme
 
-Yalnızca motoru ve ajan talimatını güncelleyin. **`guardian.toml`'u asla ezmeyin.**
+Motor güncellemesi (`guardian.py`) bir **enforcement değişikliğidir** ve kural değişikliği
+gibi ayrı, korunan bir süreçten geçer:
+
+- Güncelleme PR'ı **yalnızca** `.guardian/guardian.py` ve `.guardian/GUARDIAN.md`
+  dosyalarını içerir. Uygulama kodu ve `guardian.toml` değişikliği içermez.
+- PR'ı insan inceler ve merge eder (CODEOWNERS, Adım 6). AI ajanı `.guardian/`'ı
+  düzenleyemez (Adım 4, `deny`).
+- Bu PR'ın CI kontrolü hâlâ **eski (base) motorla** yapılır. Yeni motor ancak merge
+  edildikten sonra, sonraki PR'larda devreye girer: önce motor, sonra kod.
+- **`guardian.toml`'u asla ezmeyin.** O dosya projeye özeldir.
 
 ```bash
 cd ~/code/myapp
@@ -622,9 +678,12 @@ sınırları burada açıkça listeleniyor:
 - **Modülsüz dosya yalnızca uyarı üretir.** Kök altındaki modülsüz bir dosya üzerinden
   dolaylı bağımlılık (`donations → misc/bridge → reports`) `W001` ile görünür ama BLOCK
   olmaz. Kalibrasyonda `W001` sayısını sıfıra indirin.
-- **CI, PR'daki `guardian.py`'yi çalıştırır.** Kurallar (`guardian.toml`) base'den okunur,
-  motor ise PR'dan gelir. `.guardian/` ve `.github/workflows/` için CODEOWNERS ve
-  ajan `deny` izinleri bu yüzden zorunludur (Adım 4 ve 6).
+- **Workflow dosyası PR'dan gelir.** Motor ve kurallar base'den alınır, ancak GitHub
+  `pull_request` workflow'unu PR'daki `.github/workflows/` içeriğiyle çalıştırır. Bir PR
+  workflow'u değiştirerek Guardian adımını kaldırabilir. Bu yüzden `.github/workflows/`
+  için CODEOWNERS ve ajan `deny` izinleri zorunludur (Adım 4 ve 6).
+- **İlk kurulum PR'ında** base'de henüz `guardian.py` yoktur ve workflow PR'daki motoru
+  kullanır (uyarı yazar). Bu PR'ı mutlaka insan incelemelidir.
 - **L3 diff tabanlıdır.** Kural değişikliği içeren PR'larda tam tarama yapılır. Bunun
   dışında eşzamanlı merge'lerin çakışma riskine karşı branch korumasında "Require branches
   to be up to date before merging" seçeneğini açın.

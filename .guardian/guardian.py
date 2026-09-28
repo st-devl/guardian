@@ -9,6 +9,11 @@ Usage:
 
 Exit codes (core contract): 0 PASS, 1 BLOCK, 2 ERROR.
 
+Project root: the parent of .guardian/ when this file lives there; otherwise the current
+directory. CI relies on this to run the trusted base engine from outside the PR tree:
+  git show origin/main:.guardian/guardian.py > "$RUNNER_TEMP/guardian.py"
+  python3 "$RUNNER_TEMP/guardian.py" check --base origin/main
+
 Scope: static imports only. Runtime DI, reflection, string-based lookup and dynamic
 imports with non-literal arguments are outside V1's mechanical guarantee.
 
@@ -39,6 +44,7 @@ from functools import lru_cache
 from pathlib import Path
 
 GUARDIAN_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = GUARDIAN_DIR.parent if GUARDIAN_DIR.name == ".guardian" else Path.cwd()
 TOML_REL = ".guardian/guardian.toml"
 MAX_LINES = 10
 CONTEXT_BUDGET = 1500
@@ -711,7 +717,7 @@ def run_hook(root, stdin_text):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    root = GUARDIAN_DIR.parent
+    root = PROJECT_ROOT
     try:
         cmd, rest = (argv[0], argv[1:]) if argv else ("", [])
         if cmd == "--selftest" and not rest:
@@ -1055,6 +1061,22 @@ def selftest():
         tmp.append(nogit)
         put(nogit, TOML_REL, toml)
         ok(has(check(nogit), 2, "G004"), "no git repo -> ERROR")
+
+        # --- CI engine protection: a PR that neuters its own guardian.py is still checked
+        d3 = project({**base_files, ".guardian/guardian.py": Path(__file__).read_text()}, toml)
+        g(d3, "checkout", "-q", "-b", "pr")
+        put(d3, ".guardian/guardian.py", "import sys\nsys.exit(0)\n")
+        put(d3, "src/donations/api.ts", 'import x from "../reports/r";\n')
+        commit(d3, "bypass")
+        trusted = Path(tempfile.mkdtemp(prefix="guardian-st-"))
+        tmp.append(trusted)
+        (trusted / "guardian.py").write_text(g(d3, "show", "main:.guardian/guardian.py"))
+
+        def ci(engine):
+            return subprocess.run([sys.executable, str(engine), "check", "--base", "main"],
+                                  cwd=d3, capture_output=True).returncode
+        ok(ci(d3 / ".guardian/guardian.py") == 0, "sanity: PR engine is neutered")
+        ok(ci(trusted / "guardian.py") == 1, "CI base engine blocks a PR that neuters guardian.py")
 
         # --- context
         ctx = run_context(d, "donations")[1]
