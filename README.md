@@ -60,6 +60,8 @@ hatırlatılır ve çıktıda her zaman `[advisory]` olarak işaretlenir.
 ```
 GuardianV1/                 ← bu repo (Guardian'ın kaynağı)
 ├── README.md               ← bu dosya (hedef projeye KOPYALANMAZ)
+├── .github/workflows/
+│   └── selftest.yml        ← Guardian'ın kendi CI'ı: her push/PR'da --selftest (KOPYALANMAZ)
 └── .guardian/              ← hedef projeye kopyalanan klasörün tamamı
     ├── guardian.py         ← motor + CLI + selftest (projeden bağımsız)
     ├── GUARDIAN.md         ← AI ajanı için kısa talimat (projeden bağımsız)
@@ -105,10 +107,13 @@ GitHub'dan:
 
 ```bash
 cd ~/code/myapp
-git clone --depth 1 --branch v1.2.0 git@github.com:st-devl/guardian.git /tmp/guardian
+git clone --depth 1 --branch v1.2.1 git@github.com:st-devl/guardian.git /tmp/guardian
 cp -R /tmp/guardian/.guardian ./
 rm -rf /tmp/guardian
 ```
+
+Repo **private**'tır: clone komutu yalnızca `st-devl/guardian`'a erişimi olan bir GitHub
+hesabıyla (SSH anahtarı veya `gh auth login`) çalışır. Erişim yoksa yerel kopyayı kullanın.
 
 veya yerel kopyadan:
 
@@ -628,7 +633,8 @@ değildir.
 python3 .guardian/guardian.py context donations
 python3 .guardian/guardian.py context src/donations/controllers/x.ts
 
-# L1: yalnızca değişen dosyalar (modified, staged, untracked, renamed, deleted)
+# L1: değişen dosyalar (modified, staged, untracked, renamed, deleted)
+#     + ana branch'ten (origin/HEAD, main veya master) beri bu branch'te commit edilenler
 python3 .guardian/guardian.py check
 
 # Tam tarama (kalibrasyon, drift kontrolü)
@@ -697,6 +703,7 @@ AI düzeltme döngüsüne girmez.
 | W002 | Artık hiçbir ihlali kapsamayan exception | Exception'ı kaldırın |
 | W003 | 5'ten fazla global advisory | Global bağlamı küçültün |
 | W004 | Base branch'te yapılandırılmış Brain yok (kurulum/onboarding PR'ı); head kurallarıyla tam tarama yapılır | Normal; PR merge edilince kaybolur |
+| W005 | L1'de ana branch veya merge-base bulunamadı; yalnızca commit edilmemiş değişiklikler kontrol edildi | `main`/`master` veya `origin` ekleyin (L3 zaten tam kontrol eder) |
 
 ---
 
@@ -785,6 +792,13 @@ sınırları burada açıkça listeleniyor:
 - **L3 diff tabanlıdır.** Kural değişikliği içeren PR'larda tam tarama yapılır. Bunun
   dışında eşzamanlı merge'lerin çakışma riskine karşı branch korumasında "Require branches
   to be up to date before merging" seçeneğini açın.
+- **Test ve build araçlarının string tabanlı bağımlılıkları görülmez:** `jest.mock('x')`,
+  `vi.mock('x')`, `import.meta.glob('...')`. Bunlar string/dinamik çözümleme sayılır.
+- **İç içe template literal** (`` `${`import x from "..."`}` ``) yanlış bir ihlal (false
+  positive) üretebilir. Bu yanlış bir BLOCK'tur, sessiz PASS değildir.
+- **L1 ana branch'e göre çalışır.** Ajan doğrudan yerel `main` üzerinde commit ederse ve
+  `origin` yoksa, bu commit'ler L1'de görülmez (ajan zaten main'de çalışmamalıdır).
+  CI (L3) her durumda kontrol eder.
 - **Regex tabanlı extractor'lar** alışılmadık sözdizimlerini (Python satır devamı `\` ile
   bölünmüş import'lar, PHP şablonlarındaki HTML içi süslü parantezler gibi) kaçırabilir.
   Bu yüzden false positive ve kaçan ihlal sayıları Guardian'ın ana kalite metrikleridir.

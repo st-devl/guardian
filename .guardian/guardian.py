@@ -284,7 +284,7 @@ TOKENS = {
                       r"""|<<<[ \t]*(?P<q>['"]?)(?P<hid>\w+)(?P=q)[^\n]*\n.*?\n[ \t]*(?P=hid)\b)""", re.S),
 }
 _KINDS = ("c", "s", "t", "r", "x")
-_REGEX_PREV = set("(,=:[!&|?{};+-*%<>~^")
+_REGEX_PREV = set("(,=:[!&|?{};+-*%>~^")  # no "<": JSX "</div>"
 _REGEX_KW = {"return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void",
              "throw", "instanceof", "yield", "await"}
 
@@ -589,6 +589,23 @@ class Repo:
     def all_files(self):
         return self._rel(git(self.top, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0"))
 
+    def default_base(self):
+        for ref in ("origin/HEAD", "origin/main", "origin/master", "main", "master"):
+            try:
+                git(self.top, "rev-parse", "--verify", "-q", ref + "^{commit}")
+                return ref
+            except GuardianError:
+                pass
+        return None
+
+    def committed(self):
+        """Files committed on this branch since the default branch (L1 blind spot otherwise)."""
+        base = self.default_base()
+        try:
+            return self.diff(git(self.top, "merge-base", base, "HEAD").strip()) if base else None
+        except GuardianError:
+            return None
+
     def merge_base(self, base):
         try:
             return git(self.top, "merge-base", base, "HEAD").strip()
@@ -629,7 +646,14 @@ def run_check(root, all_=False, base=None):
     repo = Repo(root)
     if base is None:
         cfg = configured(Config(head_text), root)
-        files = repo.all_files() if all_ else repo.changed()
+        if all_:
+            files = repo.all_files()
+        else:
+            files, committed = repo.changed(), repo.committed()
+            if committed is None:
+                rep.warns.append(("W005", "WARN W005 no default branch/merge-base found; "
+                                          "L1 checks uncommitted changes only"))
+            files += committed or []
         if not all_ and TOML_REL in files:  # rule change: check the full rule scope
             files, all_ = repo.all_files(), True
         used = evaluate(cfg, root, files, rep)
@@ -848,10 +872,11 @@ const s = "import z from '../bad3'";
 const t = `export * from "../bad4"`;
 const re1 = /"/; import k from "../k";
 const div = a / 2; const y = b / 3; import m from "../m";
+const A = () => <div>x</div>; const j = require("../j");
 import ext from "react";
 '''
 ST_JS_WANT = {"src/a/x", "src/b/types", "src/c/multi", "src/d", "src/e/index", "src/f", "src/g/side",
-              "src/h/lazy", "src/i/req", "src/k", "src/m"}
+              "src/h/lazy", "src/i/req", "src/k", "src/m", "src/j"}
 
 ST_PY = r'''
 import os, pkg.users.models as um
@@ -1094,6 +1119,13 @@ def selftest():
         g(d, "reset", "-q", "--hard")
         g(d, "rm", "-q", "src/reports/r.ts")
         ok(check(d) == (0, []), "deleted file -> PASS")
+        g(d, "reset", "-q", "--hard")
+        g(d, "checkout", "-q", "-b", "l1commit")
+        put(d, "src/donations/api.ts", 'import x from "../reports/r";\n')
+        commit(d, "violation committed during the turn")
+        ok(has(check(d), 1, "BLOCK DEPS src/donations/api.ts"), "L1 sees violations committed on the branch")
+        g(d, "checkout", "-q", "main")
+        g(d, "branch", "-qD", "l1commit")
         g(d, "reset", "-q", "--hard")
 
         # warn severity, exceptions
