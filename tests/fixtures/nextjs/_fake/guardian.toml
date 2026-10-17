@@ -1,0 +1,27 @@
+# guardian:v2 — projeye özel mekanik kurallar. Bilinmeyen anahtar = ERROR.
+[ajanlar]
+gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true"
+
+[bagimliliklar]
+npm = ["next", "react", "react-dom", "typescript", "@types/*"]
+
+[limitler]
+
+[[adim]]
+ad = "lint"
+komut = "python3 araclar/lint.py"
+profil = "hizli"
+
+[[adim]]
+ad = "test"
+komut = "python3 araclar/test.py"
+profil = "tam"
+
+[ithalat]
+etkin = true
+[ithalat.modules.ui]
+paths = ["src/ui/**"]
+depends = ["lib"]
+[ithalat.modules.lib]
+paths = ["src/lib/**"]
+depends = []

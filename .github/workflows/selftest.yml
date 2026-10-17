@@ -9,5 +9,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"   # minimum supported version
-      - run: python3 .guardian/guardian.py --selftest
+          python-version: "3.11"   # desteklenen en düşük sürüm
+      - run: python3 guardian.py --selftest
+      - run: python3 -m unittest discover -s tests -v
