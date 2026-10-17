@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.guardian/guardian.py hook",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python3 .guardian/guardian.py kontrol *)",
+      "Bash(python3 .guardian/guardian.py doktor)",
+      "Bash(codex exec *)",
+      "Bash(git diff *)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git tag *)"
+    ],
+    "deny": [
+      "Edit(/.guardian/guardian.py)",
+      "Edit(/.guardian/git-hooks/**)",
+      "Edit(/.claude/settings.json)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push * --force*)"
+    ]
+  }
+}

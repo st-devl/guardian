@@ -1,0 +1,14 @@
+# guardian:v2 — proje araçlarının kurulum adımlarını (composer install, npm ci…) kontrolden önce ekleyin.
+name: guardian
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 .guardian/guardian.py kontrol --profil tam

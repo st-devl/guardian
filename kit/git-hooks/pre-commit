@@ -1,0 +1,17 @@
+#!/bin/sh
+# guardian:v2 — modelden bağımsız son halka. Düzenlemeyin; motor güncellemesi yeniler.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if [ -z "$GUARDIAN_GUNCELLEME" ] && git diff --cached --name-only --diff-filter=MDRT \
+    | grep -qE '^\.guardian/(guardian\.py|git-hooks/)'; then
+  echo "guardian: .guardian/guardian.py ve .guardian/git-hooks/ yalnızca \`guardian\` motor güncellemesiyle değişir."
+  exit 1
+fi
+
+if git diff --cached --name-only --diff-filter=MR | grep -qx '\.guardian/guardian\.toml' \
+    && ! git diff --cached -U0 -- KARARLAR.md | grep -qE '^\+- K-'; then
+  echo "guardian: guardian.toml değişikliği aynı commit'te KARARLAR.md'ye bir karar satırı ister."
+  exit 1
+fi
+
+exec python3 .guardian/guardian.py kontrol --profil tam

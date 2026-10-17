@@ -1,0 +1,40 @@
+# guardian:v2 — projeye özel mekanik kurallar. Bilinmeyen anahtar = ERROR.
+# Bu dosyayı değiştiren her commit, aynı commit'te KARARLAR.md'ye bir satır ekler (pre-commit).
+
+[ajanlar]
+gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true"
+
+# İzin listesi: listede olmayan paket = BLOCK. Desen kullanılabilir: "@types/*".
+# Platform girdileri (php, ext-*) serbesttir. Manifest yoksa ilgili liste yok sayılır.
+[bagimliliklar]
+composer = []   # composer.json: require + require-dev
+npm = []        # package.json: dependencies + devDependencies + peer + optional
+# pub = []      # pubspec.yaml
+# pip = []      # requirements.txt
+
+# Varsayılanlar: agents_md = 60 (boş satırlar hariç), claude_md = 80, durum_md = 80, karar_satir = 200
+[limitler]
+
+# Proje adımları. profil "hizli": Stop hook'ta her tur (toplam <= 20 sn: lint, tip kontrolü).
+# profil "tam": hizli + testler (görev sonu, pre-commit, CI). zaman_asimi varsayılan 120 sn.
+# {{ADIMLAR: yığına uygun [[adim]] tablolarını yazın, bu satırı silin}}
+# [[adim]]
+# ad = "lint"
+# komut = "vendor/bin/pint --test"
+# profil = "hizli"
+
+# İsteğe bağlı import sınırı motoru (js/ts, py, php, go statik importları).
+[ithalat]
+etkin = false
+# [ithalat.resolve]
+# js = { "@/" = "src/" }
+# php = { 'App\' = "app/" }
+# [ithalat.modules.domain]
+# paths = ["app/Domain/**"]
+# depends = []
+# [[ithalat.rules]]
+# id = "KATMAN-01"
+# type = "forbid_import"
+# from = ["app/Http/**"]
+# targets = ["app/Infrastructure/**"]
+# msg = "Controller altyapıyı doğrudan çağırmaz; servis kullan"
