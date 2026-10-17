@@ -85,6 +85,8 @@ class E2E(unittest.TestCase):
     def test_01_kurulum_tamamlanir(self):
         p = self.install()
         self.assertIn("doktor: 13/13 geçti", p.stdout)
+        self.assertIn('Claude Code bu klasöre güvenmek isteyip istemediğinizi sorarsa "evet" deyin; yoksa izinler yüklenmez.',
+                      p.stdout)
         self.assertEqual(self.log.read_text(), "KURULUM\n")
         self.assertEqual(self.git("config", "core.hooksPath").stdout.strip(), ".guardian/git-hooks")
         self.assertIn("- giris · html: TASARIM/giris/code.html", (self.root / ".guardian/tasarim.md").read_text())

@@ -854,6 +854,7 @@ def kurulum(root):
         f"✓ proje dosyası: {pf.name} · tasarım: {tdir or 'yok'} · CI: {'GitHub' if durum['ci'] else 'yok'}")
     if backups:
         say(f"✓ mevcut dosyalar yedeklendi: .guardian/yedek/{stamp}/ ({', '.join(backups)})")
+    say('Claude Code bu klasöre güvenmek isteyip istemediğinizi sorarsa "evet" deyin; yoksa izinler yüklenmez.')
     return claude_kurulum(root)
 
 
