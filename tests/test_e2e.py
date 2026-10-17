@@ -248,6 +248,18 @@ class E2E(unittest.TestCase):
         self.assertIn("proje.md yok veya boş", p.stdout)
         self.assertFalse((self.root / ".guardian").exists())
 
+    # ------------------------------------------------------------ incele
+    def test_17_incele_kurulum_yokken_error(self):
+        p = self.run_(sys.executable, str(GUARDIAN), "incele")
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("G018", p.stdout)
+
+    def test_18_incele_claude_acar(self):
+        self.install()
+        p = self.run_(sys.executable, str(GUARDIAN), "incele")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("İNCELEME\n", self.log.read_text())
+
 
 class E2ENext(E2E):
     """Aynı sözleşme Next.js benzeri projede; [ithalat] etkin, origin GitHub (CI kurulur)."""
@@ -284,6 +296,7 @@ class E2ENext(E2E):
     test_11_mevcut_dosyalar_yedeklenir_ve_birlestirilir = test_12_proje_md_degisince_guncelleme = None
     test_13_degismeyen_agac_onbellekten = test_14_arac_yoksa_error = None
     test_15_motor_guncelleme_statik_dosyalari_yeniler = test_16_proje_md_yoksa_error = None
+    test_17_incele_kurulum_yokken_error = test_18_incele_claude_acar = None
 
 
 if __name__ == "__main__":
