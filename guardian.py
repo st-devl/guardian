@@ -37,6 +37,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import time
 import tomllib
 from datetime import datetime
 from functools import lru_cache
@@ -53,6 +54,7 @@ TOML_REL = ".guardian/guardian.toml"
 DURUM_REL = ".guardian/durum.json"
 CACHE_REL = ".guardian/.cache"
 MAX_LINES, MAX_TOTAL = 10, 30
+HIZLI_SINIR = 20  # doktor: hizli profilin üst sınırı (saniye)
 EPILOGUE = "Kullanıcı müdahalesi gerekli. .guardian/ dosyalarını değiştirme."
 USAGE = __doc__.split("\n\n")[1]
 
@@ -362,6 +364,14 @@ def run_kontrol(root, profil):
     return 0, []
 
 
+def hizli_gecikti(sn, calisti):
+    """hizli profil süresi sınırı aşıldıysa uyarı; önbellekten dönen çalıştırma ölçülmez."""
+    if calisti and sn > HIZLI_SINIR:
+        return (f"`kontrol --profil hizli` {sn:.1f} sn sürdü (sınır {HIZLI_SINIR}); "
+                "yavaş adımları \"tam\" profile taşıyın")
+    return None
+
+
 # ---------------------------------------------------------------- HOOK
 
 def read_durum(root):
@@ -645,9 +655,17 @@ def run_doktor(root, skip=()):
                for exe, ok in [find_exe(root, a["komut"])] if not ok]
         if out:
             return out
+        cache = root / CACHE_REL / "kontrol-hizli"
+        once = read(cache)  # önbellek hit'i dosyayı dokunulmaz bırakır; değişim = kontrol çalıştı
+        t0 = time.monotonic()
         code, lines = run_kontrol(root, "hizli")
-        return [] if code == 0 else [f"`kontrol --profil hizli` exit {code}: " + " | ".join(
-            x.strip() for x in lines[:3])]
+        sn = time.monotonic() - t0
+        if code:
+            return [f"`kontrol --profil hizli` exit {code}: " + " | ".join(
+                x.strip() for x in lines[:3])]
+        if gecikme := hizli_gecikti(sn, read(cache) != once):
+            out.append(gecikme)
+        return out
 
     def ajanlar():
         out = [f"'{x}' CLI'ı PATH'te yok" for x in ("claude", "codex") if not shutil.which(x)]
@@ -1588,6 +1606,25 @@ def selftest():
         for rel, body in files.items():
             put(nogit, rel, body)
         ok(kontrol(nogit) == (0, []) and kontrol(nogit) == (0, []), "git yoksa önbelleksiz çalışır")
+
+        # --- hızlı profil süre sınırı (doktor adimlar maddesi)
+        ok(hizli_gecikti(21, False) is None and "sn sürdü (sınır 20)" in hizli_gecikti(21, True),
+           "hizli sınır: önbellek dışı aşım uyarır; hit ve sınırlı süre sessiz")
+        d = project(files)
+        write_durum(d, {"asama": "aktif"})
+        doktor_skip = ("kit", "zincir", "yer-tutucu", "claude-hook", "hook-calisiyor", "git-hook",
+                       "kanarya", "ajanlar", "senkron", "limitler", "ci", "gitignore")
+        global HIZLI_SINIR
+        eski_sinir = HIZLI_SINIR
+        try:
+            HIZLI_SINIR = 0  # her gerçek çalıştırmayı aşım say
+            r = run_doktor(d, doktor_skip)  # önbellek boş: kontrol çalışır ve ölçülür
+            ok(r[0] == 1 and any("✗ adimlar" in x and "sn sürdü" in x for x in r[1]),
+               "hizli profil sınır aşımı -> adimlar maddesi fail")
+        finally:
+            HIZLI_SINIR = eski_sinir
+        r = run_doktor(d, doktor_skip)  # önbellek hit: ölçüm sayılmaz
+        ok(r[0] == 0 and not any("sn sürdü" in x for x in r[1]), "sınır geri: önbellekten sessiz geçer")
 
         # --- hook ve çıkış kodu sözleşmesi
         d = project(files)
