@@ -75,9 +75,11 @@ CI_REL = ".github/workflows/guardian.yml"
 SETTINGS_REL = ".claude/settings.json"
 HOOKS_PATH = ".guardian/git-hooks"
 HOOK_RX = re.compile(r"\.guardian/guardian\.py\"?\s+hook\b")
-REQUIRED_ALLOW = ("Bash(python3 .guardian/guardian.py kontrol *)", "Bash(python3 .guardian/guardian.py doktor)")
+REQUIRED_ALLOW = ("Bash(python3 .guardian/guardian.py kontrol *)", "Bash(python3 .guardian/guardian.py doktor)",
+                  "Bash(git add *)", "Bash(git commit *)")
 REQUIRED_DENY = ("Edit(/.guardian/guardian.py)", "Edit(/.guardian/git-hooks/**)", "Edit(/.claude/settings.json)",
-                 "Bash(git push --force *)")
+                 "Bash(git push --force *)", "Bash(git commit *--no-verify*)", "Bash(git commit -n*)",
+                 "Bash(git commit * -n*)")
 LIMITS = {"agents_md": 60, "claude_md": 80, "durum_md": 80, "karar_satir": 200}
 KARAR_RX = re.compile(r"- K-\d{3,} · \d{4}-\d{2}-\d{2} · .+ — neden: .+")
 PLACEHOLDER_RX = re.compile(r"\{\{[^}]*\}\}")

@@ -20,7 +20,9 @@
       "Bash(git diff *)",
       "Bash(git status *)",
       "Bash(git log *)",
-      "Bash(git tag *)"
+      "Bash(git tag *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ],
     "deny": [
       "Edit(/.guardian/guardian.py)",
@@ -28,7 +30,10 @@
       "Edit(/.claude/settings.json)",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
-      "Bash(git push * --force*)"
+      "Bash(git push * --force*)",
+      "Bash(git commit *--no-verify*)",
+      "Bash(git commit -n*)",
+      "Bash(git commit * -n*)"
     ]
   }
 }

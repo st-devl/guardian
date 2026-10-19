@@ -260,6 +260,17 @@ class E2E(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("İNCELEME\n", self.log.read_text())
 
+    # ------------------------------------------------------------ v2.0.1
+    def test_19_no_verify_deny_silinirse_doktor_block(self):
+        self.install()
+        sp = self.root / ".claude/settings.json"
+        s = json.loads(sp.read_text())
+        s["permissions"]["deny"].remove("Bash(git commit *--no-verify*)")
+        sp.write_text(json.dumps(s))
+        p = self.local("doktor")
+        self.assertEqual(p.returncode, 1, p.stdout)
+        self.assertIn("Bash(git commit *--no-verify*)", p.stdout)
+
 
 class E2ENext(E2E):
     """Aynı sözleşme Next.js benzeri projede; [ithalat] etkin, origin GitHub (CI kurulur)."""
@@ -297,6 +308,7 @@ class E2ENext(E2E):
     test_13_degismeyen_agac_onbellekten = test_14_arac_yoksa_error = None
     test_15_motor_guncelleme_statik_dosyalari_yeniler = test_16_proje_md_yoksa_error = None
     test_17_incele_kurulum_yokken_error = test_18_incele_claude_acar = None
+    test_19_no_verify_deny_silinirse_doktor_block = None
 
 
 if __name__ == "__main__":

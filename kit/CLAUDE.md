@@ -12,8 +12,11 @@ yerde durdur; geri kalan her adımda bir sonrakine kendin geç.
 1. DURUM.md'den sıradaki görevi al.
 2. Riski belirle (aşağıda). Hafif değilse brif yaz.
 3. Codex'e ver. Codex bitirince `python3 .guardian/guardian.py kontrol --profil tam` sonucuna bak.
-4. Normal/kritik görevde diff'i incele (beş soru).
-5. DURUM.md'yi güncelle (görevi işaretle), sıradaki göreve geç.
+4. `git status --short` ile beklenmeyen dosya (ör. `.env`, büyük çıktı dosyaları) var mı bak;
+   varsa commit etme, kullanıcıya sor. Yoksa `git add -A`; normal/kritik görevde diff'i incele (beş soru).
+5. Onay çıktıysa (hafif görevde kontrol geçtiyse) DURUM.md'yi güncelle (görevi işaretle) ve commit et:
+   `git add -A && git commit -m "G<NN>: <görev adı>"`. Pre-commit reddi kontrol başarısızlığıdır.
+6. Sıradaki göreve geç.
 
 ## Risk seviyeleri
 - **Hafif** (metin, stil, tek fonksiyon düzeltmesi): brif yok, inceleme yok; yalnızca kontrol.
@@ -32,7 +35,7 @@ KABUL:   <ölçütler> + `python3 .guardian/guardian.py kontrol --profil tam` ex
 ```
 
 ## Diff incelemesi
-Yalnızca görev diff'i (`git diff`) ve brif okunur; proje baştan okunmaz. Beş soru:
+Yalnızca görev diff'i (`git diff HEAD`: son görev commit'inden beri) ve brif okunur; proje baştan okunmaz. Beş soru:
 1. Brif kapsamı dışına çıkıldı mı?
 2. AGENTS.md ilkelerinden biri ihlal edildi mi?
 3. Gereksiz soyutlama, katman veya yapılandırma eklendi mi?
@@ -41,7 +44,7 @@ Yalnızca görev diff'i (`git diff`) ve brif okunur; proje baştan okunmaz. Beş
 Sonuç: onay / Codex'e tek mesajlık düzeltme / kullanıcıya sor.
 
 ## Frenler
-- Aynı görevde kontrol veya inceleme 2 kez başarısız olursa dur ve kullanıcıya sor.
+- Aynı görevde kontrol (pre-commit reddi dahil) veya inceleme 2 kez başarısız olursa dur ve kullanıcıya sor.
 - Kontrol ERROR (exit 2) verirse tekrar deneme; mesajı kullanıcıya göster.
 - Kullanıcıya soru sormadan önce KARARLAR.md'de ara; karar varsa tekrar sorma.
   Yeni karar: `- K-NNN · YYYY-MM-DD · <karar> — neden: <gerekçe>` (tek satır, yalnızca eklenir).
