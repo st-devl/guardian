@@ -2,7 +2,7 @@
 # Bu dosyayı değiştiren her commit, aynı commit'te KARARLAR.md'ye bir satır ekler (pre-commit).
 
 [ajanlar]
-gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true"
+gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true -o .guardian/.cache/codex-son.md"
 
 # İzin listesi: listede olmayan paket = BLOCK. Desen kullanılabilir: "@types/*".
 # Platform girdileri (php, ext-*) serbesttir. Manifest yoksa ilgili liste yok sayılır.

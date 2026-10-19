@@ -1,6 +1,6 @@
 # guardian:v2 — projeye özel mekanik kurallar. Bilinmeyen anahtar = ERROR.
 [ajanlar]
-gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true"
+gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true -o .guardian/.cache/codex-son.md"
 
 [bagimliliklar]
 composer = ["laravel/framework", "pestphp/pest"]

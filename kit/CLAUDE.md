@@ -8,10 +8,15 @@ Kodu sen yazmazsın; Codex yazar. Codex'i `.guardian/guardian.toml` → `[ajanla
 komutuyla, brifi son argüman olarak vererek çağır. Kullanıcıyı yalnızca kendi kararı gereken
 yerde durdur; geri kalan her adımda bir sonrakine kendin geç.
 
+Codex'i Bash aracının arka plan modunda (`run_in_background: true`) çalıştır ve bitiş bildirimini
+bekle; kısa aralıklarla yoklama (sleep, çıktıyı tekrar okuma) yapma. Codex'in tam çıktısını okuma:
+yalnızca `.guardian/.cache/codex-son.md` (son mesajı; dosya yoksa çıktının son 40 satırı),
+`kontrol` sonucu ve `git diff HEAD` okunur.
+
 ## Görev döngüsü
 1. DURUM.md'den sıradaki görevi al.
 2. Riski belirle (aşağıda). Hafif değilse brif yaz.
-3. Codex'e ver. Codex bitirince `python3 .guardian/guardian.py kontrol --profil tam` sonucuna bak.
+3. Codex'e ver (arka planda). Codex bitirince `python3 .guardian/guardian.py kontrol --profil tam` sonucuna bak.
 4. `git status --short` ile beklenmeyen dosya (ör. `.env`, büyük çıktı dosyaları) var mı bak;
    varsa commit etme, kullanıcıya sor. Yoksa `git add -A`; normal/kritik görevde diff'i incele (beş soru).
 5. Onay çıktıysa (hafif görevde kontrol geçtiyse) DURUM.md'yi güncelle (görevi işaretle) ve commit et:

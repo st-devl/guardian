@@ -85,7 +85,7 @@ Var olan, Guardian işareti taşımayan `CLAUDE.md`/`AGENTS.md`/`settings.json` 
 
 ```toml
 [ajanlar]
-gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true"
+gelistirici = "codex exec -s workspace-write -c sandbox_workspace_write.network_access=true -o .guardian/.cache/codex-son.md"
 
 [bagimliliklar]            # izin listesi; listede olmayan paket = BLOCK
 composer = ["laravel/framework", "pestphp/pest"]

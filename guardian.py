@@ -1683,6 +1683,9 @@ def selftest():
                 ok(read(KIT / src, "").startswith(MARK), f"kit/{src} işaretle başlamalı")
             ok(code_lines(read(KIT / "CLAUDE.md", ""))[1:3] == ["@AGENTS.md", "@DURUM.md"], "kit CLAUDE.md içe aktarmaları")
             ok(Config(read(KIT / "guardian.toml", "")).gelistirici, "kit guardian.toml ayrıştırılır")
+            kc = read(KIT / "CLAUDE.md", "")
+            ok("git commit -m" in kc and "git diff HEAD" in kc and "run_in_background" in kc
+               and "codex-son.md" in kc, "kit CLAUDE.md commit adımı ve arka plan talimatı")
             ok(not step_limitler(KIT, Config("")), "kit dosyaları satır sınırları içinde")
             for f, n in (("README.md", 200), ("guardian.py", 1800)):
                 ok(len(read(GUARDIAN_DIR / f, "").splitlines()) <= n, f"{f} {n} satırı aşmamalı")

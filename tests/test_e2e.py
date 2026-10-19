@@ -11,7 +11,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 GUARDIAN = REPO / "guardian.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-CODEX_HELP = "Usage: codex exec [OPTIONS] [PROMPT]\n  -s, --sandbox <MODE>\n  -c, --config <key=value>\n"
+CODEX_HELP = ("Usage: codex exec [OPTIONS] [PROMPT]\n  -s, --sandbox <MODE>\n  -c, --config <key=value>\n"
+              "  -o, --output-last-message <FILE>\n")
 
 
 class E2E(unittest.TestCase):
