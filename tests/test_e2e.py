@@ -272,6 +272,24 @@ class E2E(unittest.TestCase):
         self.assertEqual(p.returncode, 1, p.stdout)
         self.assertIn("Bash(git commit *--no-verify*)", p.stdout)
 
+    def test_20_motor_guncelleme_settings_birlestirir(self):
+        self.install()
+        sp = self.root / ".claude/settings.json"
+        s = json.loads(sp.read_text())
+        yeni = ["Bash(git add *)", "Bash(git commit *)"]
+        s["permissions"]["allow"] = [r for r in s["permissions"]["allow"] if r not in yeni] + ["Bash(make *)"]
+        sp.write_text(json.dumps(s, indent=2))
+        d = self.durum()
+        d["kit_surumu"] = "2.0.0"
+        (self.root / ".guardian/durum.json").write_text(json.dumps(d))
+        self.commit_all("2.0.0 kurulumu", check=0)
+        p = self.guardian(check=0)
+        self.assertIn("doktor: 13/13 geçti", p.stdout)
+        allow = json.loads(sp.read_text())["permissions"]["allow"]
+        self.assertTrue(set(yeni) <= set(allow) and "Bash(make *)" in allow, allow)
+        self.assertEqual(self.git("status", "--short").stdout, "")
+        self.local("doktor", check=0)
+
 
 class E2ENext(E2E):
     """Aynı sözleşme Next.js benzeri projede; [ithalat] etkin, origin GitHub (CI kurulur)."""
@@ -309,7 +327,7 @@ class E2ENext(E2E):
     test_13_degismeyen_agac_onbellekten = test_14_arac_yoksa_error = None
     test_15_motor_guncelleme_statik_dosyalari_yeniler = test_16_proje_md_yoksa_error = None
     test_17_incele_kurulum_yokken_error = test_18_incele_claude_acar = None
-    test_19_no_verify_deny_silinirse_doktor_block = None
+    test_19_no_verify_deny_silinirse_doktor_block = test_20_motor_guncelleme_settings_birlestirir = None
 
 
 if __name__ == "__main__":

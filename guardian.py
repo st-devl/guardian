@@ -791,6 +791,21 @@ def merge_settings(cur, kit):
     return cur
 
 
+def settings_birlestir(root):
+    """Kit settings'ini projeye birleştirir (yalnızca eksikleri ekler); dosya değiştiyse True."""
+    kit_settings = json.loads((KIT / "claude-settings.json").read_text(encoding="utf-8"))
+    sp = root / SETTINGS_REL
+    try:
+        cur = json.loads(read(sp) or "{}")
+    except ValueError:
+        raise GuardianError("G018", f"{SETTINGS_REL} geçersiz JSON; düzeltin veya silin")
+    new = json.dumps(merge_settings(cur, kit_settings), indent=2, ensure_ascii=False) + "\n"
+    if new == read(sp, ""):
+        return False
+    write(sp, new)
+    return True
+
+
 def kurulum(root):
     say("Guardian V2 kurulumu", "")
     for x in ("git",):
@@ -831,13 +846,7 @@ def kurulum(root):
         if not p.is_file() or rel in backups:
             write(p, (KIT / src).read_text(encoding="utf-8"))
     install_static(root, durum)
-    kit_settings = json.loads((KIT / "claude-settings.json").read_text(encoding="utf-8"))
-    sp = root / SETTINGS_REL
-    try:
-        cur = json.loads(read(sp) or "{}")
-    except ValueError:
-        raise GuardianError("G018", f"{SETTINGS_REL} geçersiz JSON; düzeltin veya silin")
-    write(sp, json.dumps(merge_settings(cur, kit_settings), indent=2, ensure_ascii=False) + "\n")
+    settings_birlestir(root)
     try:
         durum["ci"] = "github.com" in git(root, "remote", "get-url", "origin")
     except GuardianError:
@@ -874,7 +883,7 @@ def motor_guncelle(root, durum):
     old = durum.get("kit_surumu")
     changed = install_static(root, durum)
     write_durum(root, durum)
-    paths = changed + [DURUM_REL]
+    paths = changed + [DURUM_REL] + ([SETTINGS_REL] if settings_birlestir(root) else [])
     say(f"Motor güncellendi: {old} → {VERSION} ({len(changed)} statik dosya)")
     env = {**os.environ, "GUARDIAN_GUNCELLEME": "1"}
     git(root, "add", "--", *paths)
