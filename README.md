@@ -18,8 +18,14 @@ yoktur; kontrol edemediği şeyi asla geçti saymaz.
 ## Bir kerelik kurulum
 
 ```sh
-git clone git@github.com:st-devl/guardian.git ~/guardian
+git clone --branch v2.0.1 https://github.com/st-devl/guardian.git ~/guardian
 sh ~/guardian/install.sh        # `guardian` komutunu ~/.local/bin altına bağlar
+```
+
+Güncelleme (yeni sürüme geçip proje kökünde `guardian` yazın; motor kendini günceller):
+
+```sh
+git -C ~/guardian fetch --tags && git -C ~/guardian checkout v2.0.X
 ```
 
 Gerekenler: Python 3.11+, `git`, [Claude Code](https://code.claude.com) (`claude`), Codex CLI (`codex`).

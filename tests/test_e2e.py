@@ -238,9 +238,9 @@ class E2E(unittest.TestCase):
         self.edit("CLAUDE.md", lambda t: t + "eski satır\n")
         self.commit_all("eski kit", check=0)
         p = self.guardian(check=0)
-        self.assertIn("Motor güncellendi: 1.9.0 → 2.0.0", p.stdout)
+        self.assertIn("Motor güncellendi: 1.9.0 → 2.0.1", p.stdout)
         self.assertNotIn("eski satır", (self.root / "CLAUDE.md").read_text())
-        self.assertIn("guardian: motor 2.0.0", self.git("log", "-1", "--format=%s").stdout)
+        self.assertIn("guardian: motor 2.0.1", self.git("log", "-1", "--format=%s").stdout)
 
     def test_16_proje_md_yoksa_error(self):
         (self.root / "proje.md").unlink()

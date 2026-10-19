@@ -43,7 +43,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 MARK = "<!-- guardian:v2 -->"
 SELF = Path(__file__).resolve()
 GUARDIAN_DIR = SELF.parent
